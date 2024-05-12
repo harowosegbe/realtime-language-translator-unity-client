@@ -10,6 +10,8 @@ using System.Linq;
 using UnityEngine.UI;
 using UnityEngine.Networking;
 using System.Text;
+using TMPro;
+using UnityEngine.Events;
 
 
 
@@ -20,13 +22,13 @@ public class Manager : MonoBehaviour
     NRAudioCapture m_AudioCapture = null;
 
     [SerializeField] private RawImage m_Preview = null;
+    [SerializeField] private TextMeshProUGUI m_DisplayText = null;
     [SerializeField] private AudioSource m_Audio = null;
     AudioClip m_CurrentAudio = null;
 
     [SerializeField] private List<string> m_Translations = new List<string>();
     [SerializeField] private int m_CurrentSendIndex = 0;
 
-    
     [SerializeField] private string m_APIBaseURL = "";
 
     public string VideoSavePath
@@ -39,11 +41,19 @@ public class Manager : MonoBehaviour
         }
     }
 
+    public class TranslationResponse
+    {
+        public string error;
+        public string success;
+        public string translation;
+    }
  
     // Start is called before the first frame update
     void Start()
     {
         StartRecording();
+        UpdateTextDisplay();
+        // NRInput.AddClickListener(ControllerHandEnum.)
     }
 
     void CreateVideoCapture()
@@ -74,7 +84,7 @@ public class Manager : MonoBehaviour
             camMode = CamMode.None
         };
         
-        StartCoroutine(AudioInput(5));
+        StartCoroutine(AudioInput(10));
         // m_VideoCapture.StartVideoModeAsync(cameraParameters, OnStartedVideoCaptureMode);
         // m_AudioCapture.StartAudioModeAsync(cameraParameters, OnEndedAudioCaptureMode);
     }
@@ -110,6 +120,17 @@ public class Manager : MonoBehaviour
         StartCoroutine(AudioInput(5));        
     }
 
+    private void UpdateTextDisplay (){
+
+        m_DisplayText.text = "";
+
+        foreach (var item in m_Translations)
+        {
+            m_DisplayText.text += item + " ";
+        }
+
+    }
+
     IEnumerator AudioInput(int loopTime = 10){
 
         if (Microphone.IsRecording(null))
@@ -134,23 +155,23 @@ public class Manager : MonoBehaviour
         // async 
         //send to API
         // StartCoroutine(SendAudioData(m_CurrentAudio));
-        StartCoroutine(SendAudioData(audioData));
+        StartCoroutine(SendAudioData(audioData, (text)=>{
 
-        // 5 seconds to 10 seconds
-        //API return back text
-        m_Translations.Add("Translation"+ m_CurrentSendIndex);
+            TranslationResponse response = JsonUtility.FromJson<TranslationResponse>(text);
 
-        // display texton glasses
-
-        //Debug
-        // m_Audio.clip = m_CurrentAudio;
-        // m_Audio.Play();
+            if (!String.IsNullOrEmpty(response.translation))
+            {
+                m_Translations.Add(response.translation);
+                UpdateTextDisplay();
+            }
+            
+        }));
 
         m_CurrentSendIndex++;
-        StartCoroutine(AudioInput(5));
+        // StartCoroutine(AudioInput(5));
     }
 
-    IEnumerator SendAudioData(byte[] audioData)
+    IEnumerator SendAudioData(byte[] audioData, UnityAction<string> callback)
     {
 
         // Encode audio data as base64 string
@@ -180,6 +201,7 @@ public class Manager : MonoBehaviour
                 // Parse response from server (if any)
                 string responseText = www.downloadHandler.text;
                 Debug.Log("Server response: " + responseText);
+                callback.Invoke(responseText);
             }
         }
     }

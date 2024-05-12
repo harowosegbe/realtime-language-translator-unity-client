@@ -6,6 +6,6 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/NRSDK/Demos/HelloMR.unity
-    guid: dd74f1c9685ef48499229d4957b58000
+    path: Assets/Realtime Language Translator/Scene/Main.unity
+    guid: 99d9f35b9dbd7ec4687e13fb11b3c993
   m_configObjects: {}
