@@ -18,6 +18,7 @@ using UnityEngine.Events;
 public class Manager : MonoBehaviour
 {
     NRAudioCapture m_AudioCapture = null;
+    NRVideoCapture m_VideoCapture = null;
 
     [Header("UI Objects")]
     [SerializeField] private TextMeshProUGUI m_DisplayText = null;
@@ -37,16 +38,6 @@ public class Manager : MonoBehaviour
     [SerializeField] private int m_ListenDuration = 5;
     [SerializeField] private bool m_SystemListenState = false;
 
-    public string VideoSavePath
-    {
-        get
-        {
-            string timeStamp = Time.time.ToString().Replace(".", "").Replace(":", "");
-            string filename = string.Format("Xreal_Record_{0}.mp4", timeStamp);
-            return Path.Combine(Application.persistentDataPath, filename);
-        }
-    }
-
     public class TranslationResponse
     {
         public string error;
@@ -61,6 +52,8 @@ public class Manager : MonoBehaviour
         public string fromLang;
         public string toLang;
     }
+
+    string m_DefaultMicDevice = null;
  
     // Start is called before the first frame update
     void Start()
@@ -89,6 +82,10 @@ public class Manager : MonoBehaviour
                 new TMP_Dropdown.OptionData(item)
             );
         }
+
+        m_FromLangDropdown.value = 1;
+
+        // m_DefaultMicDevice = Microphone.devices[0];
         
     }
 
@@ -110,12 +107,16 @@ public class Manager : MonoBehaviour
 
     void CreateAudioCapture()
     {
+        NRVideoCapture.CreateAsync(false, (video)=>{
+            m_VideoCapture = video;
+        });
+
         m_AudioCapture = NRAudioCapture.Create();
         m_AudioCapture.OnAudioData += OnAudioDataReceived;
     }
 
     void StartRecording(){
-        if (m_AudioCapture == null)
+        if (m_AudioCapture == null || m_VideoCapture == null)
         {
             CreateAudioCapture();
         }
@@ -125,8 +126,10 @@ public class Manager : MonoBehaviour
 
     void StopRecording(){
 
+        Microphone.End(m_DefaultMicDevice);
         StopAllCoroutines();
         EndAndSendAudioData();
+        
     }
 
     private void UpdateUIDisplays (){
@@ -161,31 +164,22 @@ public class Manager : MonoBehaviour
 
     IEnumerator AudioInput(int loopTime = 10){
 
-        if (Microphone.IsRecording(null))
+        if (!Microphone.IsRecording(m_DefaultMicDevice))
         {
-            Microphone.End(null);
+            m_CurrentAudio = Microphone.Start(m_DefaultMicDevice, true, loopTime, 44100);
         }
-
-        //button to trigger listening
         
-        m_CurrentAudio = Microphone.Start(null, false, loopTime, 44100);
-        
-        yield return new WaitForSeconds(10);
-        
-        EndAndSendAudioData();
-        
-        m_CurrentSendIndex++;
-        m_Translations.Add("");
-        StartCoroutine(AudioInput(m_ListenDuration));
+        while (Microphone.IsRecording(m_DefaultMicDevice))
+        {
+            yield return new WaitForSeconds(loopTime); // Wait for loopTime seconds
+            EndAndSendAudioData();
+        }
 
     }
 
     private void EndAndSendAudioData(){
 
         int translationIndex = m_CurrentSendIndex;
-
-        // Stop recording
-        Microphone.End(null);
 
         // Convert audio clip to WAV format
         byte[] audioData = WavUtility.FromAudioClip(m_CurrentAudio);
@@ -201,7 +195,8 @@ public class Manager : MonoBehaviour
 
         if (!String.IsNullOrEmpty(response.translation))
         {
-            m_Translations.Insert(index, response.translation);
+            // m_Translations.Insert(index, response.translation);
+            m_Translations.Add(response.translation);
             UpdateUIDisplays();
         }
     }
