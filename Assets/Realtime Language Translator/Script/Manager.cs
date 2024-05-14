@@ -22,6 +22,7 @@ public class Manager : MonoBehaviour
 
     [Header("UI Objects")]
     [SerializeField] private TextMeshProUGUI m_DisplayText = null;
+    [SerializeField] private TextMeshProUGUI m_Microphone = null;
     [SerializeField] private TMP_Dropdown m_FromLangDropdown = null;
     [SerializeField] private TMP_Dropdown m_ToLangDropdown = null;
     [SerializeField] private Button m_StartButton = null;
@@ -85,7 +86,8 @@ public class Manager : MonoBehaviour
 
         m_FromLangDropdown.value = 1;
 
-        // m_DefaultMicDevice = Microphone.devices[0];
+        m_DefaultMicDevice = Microphone.devices[0];
+        m_Microphone.text = "Mic: " + m_DefaultMicDevice;
         
     }
 
