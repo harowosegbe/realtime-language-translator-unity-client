@@ -38,6 +38,7 @@ public class Manager : MonoBehaviour
     [SerializeField] private string m_APIBaseURL = "";
     [SerializeField] private int m_ListenDuration = 5;
     [SerializeField] private bool m_SystemListenState = false;
+    [SerializeField] private string m_AuthToken = "6OVhqV-?0l1f11T&+OJ9:0:2WR";
 
     public class TranslationResponse
     {
@@ -59,7 +60,6 @@ public class Manager : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        // StartRecording();
         UpdateUIDisplays();
 
         ControllerType controllerType = NRInput.GetControllerType();
@@ -70,6 +70,7 @@ public class Manager : MonoBehaviour
             m_StartButton.onClick.AddListener(OnStartButtonClicked);
         }
 
+        //Here we clear the language dropdown at start
         m_FromLangDropdown.options.Clear();
         m_ToLangDropdown.options.Clear();
 
@@ -86,11 +87,13 @@ public class Manager : MonoBehaviour
 
         m_FromLangDropdown.value = 1;
 
+        //Initialise the Microphone
         m_DefaultMicDevice = Microphone.devices[0];
         m_Microphone.text = "Mic: " + m_DefaultMicDevice;
         
     }
 
+    //Function called when Start button is clicked
     private void OnStartButtonClicked()
     {
         m_SystemListenState = !m_SystemListenState;
@@ -107,6 +110,7 @@ public class Manager : MonoBehaviour
 
     }
 
+    // Function to create audio capture request
     void CreateAudioCapture()
     {
         NRVideoCapture.CreateAsync(false, (video)=>{
@@ -116,7 +120,8 @@ public class Manager : MonoBehaviour
         m_AudioCapture = NRAudioCapture.Create();
         m_AudioCapture.OnAudioData += OnAudioDataReceived;
     }
-
+    
+    // Function called to start recording, if audio or video capture is not present we create a new one and request permission
     void StartRecording(){
         if (m_AudioCapture == null || m_VideoCapture == null)
         {
@@ -126,6 +131,7 @@ public class Manager : MonoBehaviour
         StartCoroutine(AudioInput(m_ListenDuration));
     }
 
+    // Function called to stop recording
     void StopRecording(){
 
         Microphone.End(m_DefaultMicDevice);
@@ -134,6 +140,7 @@ public class Manager : MonoBehaviour
         
     }
 
+    // Function to refresh UI displays
     private void UpdateUIDisplays (){
 
         m_DisplayText.text = "";
@@ -164,6 +171,7 @@ public class Manager : MonoBehaviour
 
     }
 
+    // Function to start microphone capture
     IEnumerator AudioInput(int loopTime = 10){
 
         if (!Microphone.IsRecording(m_DefaultMicDevice))
@@ -179,6 +187,7 @@ public class Manager : MonoBehaviour
 
     }
 
+    // Function to clip current microphone data and send request to the API server
     private void EndAndSendAudioData(){
 
         int translationIndex = m_CurrentSendIndex;
@@ -192,17 +201,18 @@ public class Manager : MonoBehaviour
         }));
     }
 
+    // Function to handle API response and update AR text display
     private void HandleResponseText (string text, int index){
         TranslationResponse response = JsonUtility.FromJson<TranslationResponse>(text);
 
         if (!String.IsNullOrEmpty(response.translation))
         {
-            // m_Translations.Insert(index, response.translation);
             m_Translations.Add(response.translation);
             UpdateUIDisplays();
         }
     }
 
+    // Function that handles sending translation request to the API
     IEnumerator SendAudioData(byte[] audioData, UnityAction<string> callback)
     {
 
@@ -215,10 +225,8 @@ public class Manager : MonoBehaviour
             toLang = m_ToLangDropdown.options[m_ToLangDropdown.value].text
         };
 
-        string json = JsonUtility.ToJson(audioDataJson);
-
         // Create JSON object with audio data
-        // string json = "{\"audio\": \"" + base64Audio + "\", \"lang\": \"" + m_FromLangDropdown.value + "\"}";
+        string json = JsonUtility.ToJson(audioDataJson);
 
         // Replace with your server URL
         string serverURL = m_APIBaseURL + "/v1/translation";
@@ -227,6 +235,7 @@ public class Manager : MonoBehaviour
         {
             www.method = UnityWebRequest.kHttpVerbPOST;
             www.SetRequestHeader("Content-Type", "application/json");
+            www.SetRequestHeader("Authorization", m_AuthToken);
 
             // Send request and wait for response
             yield return www.SendWebRequest();
@@ -246,11 +255,9 @@ public class Manager : MonoBehaviour
         }
     }
 
-
-
+    // Optional function to handle Audio data callback
     private void OnAudioDataReceived(IntPtr data, uint size)
     {
-        // throw new NotImplementedException();
         print("Data Recieved");
     }
 

@@ -279,9 +279,10 @@ MonoBehaviour:
   - Spanish
   m_Translations: []
   m_CurrentSendIndex: 0
-  m_APIBaseURL: https://realtime-language-translator.onrender.com
-  m_ListenDuration: 5
+  m_APIBaseURL: http://localhost:5000
+  m_ListenDuration: 2
   m_SystemListenState: 0
+  m_AuthToken: 6OVhqV-?0l1f11T&+OJ9:0:2WR
 --- !u!4 &45968103
 Transform:
   m_ObjectHideFlags: 0
