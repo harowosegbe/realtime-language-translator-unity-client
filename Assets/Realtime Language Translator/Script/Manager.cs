@@ -12,7 +12,7 @@ using UnityEngine.Networking;
 using System.Text;
 using TMPro;
 using UnityEngine.Events;
-
+using SocketIOClient;
 
 
 public class Manager : MonoBehaviour
@@ -34,11 +34,17 @@ public class Manager : MonoBehaviour
 
     [SerializeField] private List<string> m_Translations = new();
     [SerializeField] private int m_CurrentSendIndex = 0;
+    private const int sampleRate = 16000;
+
 
     [SerializeField] private string m_APIBaseURL = "";
     [SerializeField] private int m_ListenDuration = 5;
+    [SerializeField] private int m_ChirpListenDuration = 5;
+    [SerializeField] private int m_MicLoopDuration = 5;
     [SerializeField] private bool m_SystemListenState = false;
     [SerializeField] private string m_AuthToken = "6OVhqV-?0l1f11T&+OJ9:0:2WR";
+    [SerializeField] public SocketIOUnity socket;
+
 
     public class TranslationResponse
     {
@@ -50,12 +56,14 @@ public class Manager : MonoBehaviour
     [System.Serializable]
     public class AudioTranslateData
     {
-        public string audio;
+        public byte[] audio;
         public string fromLang;
         public string toLang;
+        public string authToken;
     }
 
     string m_DefaultMicDevice = null;
+    string m_TranslatedString = "";
  
     // Start is called before the first frame update
     void Start()
@@ -85,12 +93,78 @@ public class Manager : MonoBehaviour
             );
         }
 
-        m_FromLangDropdown.value = 1;
+        m_FromLangDropdown.value = 0;
 
         //Initialise the Microphone
         m_DefaultMicDevice = Microphone.devices[0];
         m_Microphone.text = "Mic: " + m_DefaultMicDevice;
+
+        //Socket io Connect
+        var uri = new Uri(m_APIBaseURL);       
+        socket = new SocketIOUnity(uri);
+
+        socket.OnConnected += OnSocketConnected;
+        socket.On("error", OnSocketError);
+
+        socket.On("transcription", response =>
+        {
+            string text = response.GetValue<string>();
+            m_TranslatedString = text;
+        });
+
+        socket.Connect();
+
+        //dropdown change
+        m_FromLangDropdown.onValueChanged.AddListener(OnDropDownChange);
+        m_ToLangDropdown.onValueChanged.AddListener(OnDropDownChange);
+
+        //Start Display Update
+        StartCoroutine(HandleResponseText());
         
+    }
+
+    // When the socket is connected we set the initial client configuration
+    private void OnSocketConnected(object sender, EventArgs e)
+    {
+        UpdateLanguageConfig();
+    }
+
+    //If there is a socket error we reconnect again
+    private void OnSocketError(SocketIOResponse response)
+    {
+        Debug.LogError("Socket error");
+        UpdateLanguageConfig();
+    }
+
+    //When the language dropdown is changed we update the client on the websocket
+    private void OnDropDownChange(int arg0)
+    {
+        UpdateLanguageConfig();
+
+        if (arg0 == 1 || arg0 == 2 || arg0 == 3)
+        {
+            m_MicLoopDuration = m_ChirpListenDuration;
+        }
+        else{
+            m_MicLoopDuration = 1;
+        }
+    }
+    
+    // We update the client configuration by emiting a socket event
+    private void UpdateLanguageConfig(){
+
+        if (socket.Connected)
+        {
+            AudioTranslateData audioDataJson = new (){
+                fromLang = m_FromLangDropdown.options[m_FromLangDropdown.value].text,
+                toLang = m_ToLangDropdown.options[m_ToLangDropdown.value].text,
+                authToken = m_AuthToken
+            };
+
+            string json = JsonUtility.ToJson(audioDataJson);
+
+            socket.EmitStringAsJSONAsync("config", json);
+        }
     }
 
     //Function called when Start button is clicked
@@ -118,7 +192,6 @@ public class Manager : MonoBehaviour
         });
 
         m_AudioCapture = NRAudioCapture.Create();
-        m_AudioCapture.OnAudioData += OnAudioDataReceived;
     }
     
     // Function called to start recording, if audio or video capture is not present we create a new one and request permission
@@ -128,7 +201,7 @@ public class Manager : MonoBehaviour
             CreateAudioCapture();
         }
 
-        StartCoroutine(AudioInput(m_ListenDuration));
+        StartCoroutine(AudioInput());
     }
 
     // Function called to stop recording
@@ -142,15 +215,6 @@ public class Manager : MonoBehaviour
 
     // Function to refresh UI displays
     private void UpdateUIDisplays (){
-
-        m_DisplayText.text = "";
-
-        var latestTranslations = m_Translations.TakeLast(5);
-
-        foreach (var item in latestTranslations)
-        {
-            m_DisplayText.text += item + " ";
-        }
 
         var btnText = m_StartButton.GetComponentInChildren<TextMeshProUGUI>();
 
@@ -172,17 +236,18 @@ public class Manager : MonoBehaviour
     }
 
     // Function to start microphone capture
-    IEnumerator AudioInput(int loopTime = 10){
+    IEnumerator AudioInput(){
 
         if (!Microphone.IsRecording(m_DefaultMicDevice))
         {
-            m_CurrentAudio = Microphone.Start(m_DefaultMicDevice, true, loopTime, 44100);
+            m_CurrentAudio = Microphone.Start(m_DefaultMicDevice, true, m_MicLoopDuration, sampleRate);
         }
         
         while (Microphone.IsRecording(m_DefaultMicDevice))
         {
-            yield return new WaitForSeconds(loopTime); // Wait for loopTime seconds
             EndAndSendAudioData();
+            yield return new WaitForSeconds(m_MicLoopDuration); // Wait for loopTime seconds
+
         }
 
     }
@@ -194,71 +259,33 @@ public class Manager : MonoBehaviour
 
         // Convert audio clip to WAV format
         byte[] audioData = WavUtility.FromAudioClip(m_CurrentAudio);
+        
+        //Send Audio to Socket
+        if (socket.Connected)
+        {
+            socket.EmitAsync("audio", audioData);
+        }
 
         //Send Audio to API
-        StartCoroutine(SendAudioData(audioData, (text)=>{
-            HandleResponseText(text, translationIndex);
-        }));
+        // StartCoroutine(SendAudioData(audioData, (text)=>{
+        //     HandleResponseText(text, translationIndex);
+        // }));
     }
 
     // Function to handle API response and update AR text display
-    private void HandleResponseText (string text, int index){
-        TranslationResponse response = JsonUtility.FromJson<TranslationResponse>(text);
+    IEnumerator HandleResponseText (){
 
-        if (!String.IsNullOrEmpty(response.translation))
+        while (true)
         {
-            m_Translations.Add(response.translation);
-            UpdateUIDisplays();
+            m_DisplayText.text = m_TranslatedString;
+            yield return new WaitForSeconds(0.25f);
         }
     }
 
-    // Function that handles sending translation request to the API
-    IEnumerator SendAudioData(byte[] audioData, UnityAction<string> callback)
+    // On application quite we dispose the socket
+    void OnApplicationQuit()
     {
-
-        // Encode audio data as base64 string
-        string base64Audio = System.Convert.ToBase64String(audioData);
-        
-        AudioTranslateData audioDataJson = new (){
-            audio = base64Audio,
-            fromLang = m_FromLangDropdown.options[m_FromLangDropdown.value].text,
-            toLang = m_ToLangDropdown.options[m_ToLangDropdown.value].text
-        };
-
-        // Create JSON object with audio data
-        string json = JsonUtility.ToJson(audioDataJson);
-
-        // Replace with your server URL
-        string serverURL = m_APIBaseURL + "/v1/translation";
-
-        using (UnityWebRequest www = UnityWebRequest.Put(serverURL, Encoding.UTF8.GetBytes(json)))
-        {
-            www.method = UnityWebRequest.kHttpVerbPOST;
-            www.SetRequestHeader("Content-Type", "application/json");
-            www.SetRequestHeader("Authorization", m_AuthToken);
-
-            // Send request and wait for response
-            yield return www.SendWebRequest();
-
-            // Check for errors
-            if (www.result != UnityWebRequest.Result.Success)
-            {
-                Debug.Log("Error sending audio data: " + www.error);
-            }
-            else
-            {
-                // Parse response from server (if any)
-                string responseText = www.downloadHandler.text;
-                Debug.Log("Server response: " + responseText);
-                callback.Invoke(responseText);
-            }
-        }
-    }
-
-    // Optional function to handle Audio data callback
-    private void OnAudioDataReceived(IntPtr data, uint size)
-    {
-        print("Data Recieved");
+        socket.Dispose();
     }
 
 }
