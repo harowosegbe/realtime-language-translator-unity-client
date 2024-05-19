@@ -277,8 +277,8 @@ MonoBehaviour:
   - Yoruba
   - Igbo
   - Hausa
-  - Spanish
   - French
+  - Spanish
   m_Translations: []
   m_CurrentSendIndex: 0
   m_APIBaseURL: https://realtime-language-translator.onrender.com
