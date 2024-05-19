@@ -18,19 +18,12 @@ Before you begin, ensure you have met the following requirements:
 
 ## Getting Started
 
-### 1. Clone the Repository
-
-```bash
-git https://github.com/harowosegbe/realtime-language-translator-unity-client.git
-cd realtime-language-translator-unity-client
-```
-
-### 2. Open the Project in Unity
+### 1. Open the Project in Unity
 - Launch Unity Hub.
 - Click on the "Open" button.
 - Navigate to the cloned repository folder and select it.
 
-### 3. Import Required Packages
+### 2. Import Required Packages
 
 1. ***Import XREAL SDK***:
     - Download the XREAL SDK from the XREAL developer portal.
@@ -40,7 +33,7 @@ cd realtime-language-translator-unity-client
     - Download the Socket.IO package from the UnitySocketIO GitHub.
     - Import the package into your Unity project.
 
-### 4. Configure the Socket.IO Client
+### 3. Configure the Socket.IO Client
 - Open the /Realtime Language Translator/Script/Manager.cs file.
 
 - Configure the server URL:
@@ -49,12 +42,12 @@ cd realtime-language-translator-unity-client
 [SerializeField] private string m_APIBaseURL = "http://your.server.url:3000";
 ```
 
-### 5. Configure XREAL SDK
+### 4. Configure XREAL SDK
 - Follow the XREAL SDK documentation to set up your scene for AR display.
 - Create a UI element (e.g., TextMeshPro text) to display the transcriptions.
 - Ensure the UI element is positioned correctly in the AR space.
 
-### 6. Run the Project
+### 5. Run the Project
 - Connect your XREAL glasses to your development environment.
 - Press the "Play" button in Unity to start the application.
 - The client should now connect to the server and display real-time transcriptions on the AR glasses. 
