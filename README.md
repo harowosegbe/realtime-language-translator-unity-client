@@ -32,13 +32,13 @@ cd realtime-language-translator-unity-client
 
 ### 3. Import Required Packages
 
-    1. ***Import XREAL SDK***:
-        - Download the XREAL SDK from the XREAL developer portal.
-        - Import the SDK into your Unity project.
+1. ***Import XREAL SDK***:
+    - Download the XREAL SDK from the XREAL developer portal.
+    - Import the SDK into your Unity project.
 
-    2. ***Import Socket.IO for Unity***:
-        - Download the Socket.IO package from the UnitySocketIO GitHub.
-        - Import the package into your Unity project.
+2. ***Import Socket.IO for Unity***:
+    - Download the Socket.IO package from the UnitySocketIO GitHub.
+    - Import the package into your Unity project.
 
 ### 4. Configure the Socket.IO Client
 - Open the /Realtime Language Translator/Script/Manager.cs file.
