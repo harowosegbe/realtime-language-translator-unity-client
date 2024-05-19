@@ -23,9 +23,11 @@ public class Manager : MonoBehaviour
     [Header("UI Objects")]
     [SerializeField] private TextMeshProUGUI m_DisplayText = null;
     [SerializeField] private TextMeshProUGUI m_Microphone = null;
+    [SerializeField] private TextMeshProUGUI m_Debug = null;
     [SerializeField] private TMP_Dropdown m_FromLangDropdown = null;
     [SerializeField] private TMP_Dropdown m_ToLangDropdown = null;
     [SerializeField] private Button m_StartButton = null;
+    [SerializeField] private GameObject m_Indicator = null;
 
     [Header("Audio")]
     [SerializeField] private AudioSource m_Audio = null;
@@ -121,6 +123,7 @@ public class Manager : MonoBehaviour
         //Start Display Update
         StartCoroutine(HandleResponseText());
         
+        m_Indicator.SetActive(false);
     }
 
     // When the socket is connected we set the initial client configuration
@@ -132,7 +135,7 @@ public class Manager : MonoBehaviour
     //If there is a socket error we reconnect again
     private void OnSocketError(SocketIOResponse response)
     {
-        Debug.LogError("Socket error");
+        ScreenDebug("Socket error");
         UpdateLanguageConfig();
     }
 
@@ -196,12 +199,15 @@ public class Manager : MonoBehaviour
     
     // Function called to start recording, if audio or video capture is not present we create a new one and request permission
     void StartRecording(){
+
         if (m_AudioCapture == null || m_VideoCapture == null)
         {
             CreateAudioCapture();
         }
 
         StartCoroutine(AudioInput());
+
+        m_Indicator.SetActive(true);
     }
 
     // Function called to stop recording
@@ -211,6 +217,7 @@ public class Manager : MonoBehaviour
         StopAllCoroutines();
         EndAndSendAudioData();
         
+        m_Indicator.SetActive(false);
     }
 
     // Function to refresh UI displays
@@ -255,21 +262,22 @@ public class Manager : MonoBehaviour
     // Function to clip current microphone data and send request to the API server
     private void EndAndSendAudioData(){
 
-        int translationIndex = m_CurrentSendIndex;
-
         // Convert audio clip to WAV format
         byte[] audioData = WavUtility.FromAudioClip(m_CurrentAudio);
         
         //Send Audio to Socket
         if (socket.Connected)
         {
-            socket.EmitAsync("audio", audioData);
+            ScreenDebug("emiting audio" + audioData.Length);
+
+            AudioTranslateData audioDataJson = new (){
+                audio = audioData,
+            };
+
+            string json = JsonUtility.ToJson(audioDataJson);
+            socket.EmitStringAsJSONAsync("audio", json);
         }
 
-        //Send Audio to API
-        // StartCoroutine(SendAudioData(audioData, (text)=>{
-        //     HandleResponseText(text, translationIndex);
-        // }));
     }
 
     // Function to handle API response and update AR text display
@@ -286,6 +294,15 @@ public class Manager : MonoBehaviour
     void OnApplicationQuit()
     {
         socket.Dispose();
+    }
+
+    void ScreenDebug(string message){
+
+        if (m_Debug)
+        {
+            m_Debug.text = message;
+        }
+        
     }
 
 }
